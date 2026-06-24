@@ -1,5 +1,5 @@
 [build]
-  command = "bun run build"
+  command = "bun run build && cp -r dist/server netlify/functions/server-dist"
   publish = "dist/client"
 
 [build.environment]
@@ -8,7 +8,7 @@
 
 [functions]
   directory = "netlify/functions"
-  node_bundler = "esbuild"
+  node_bundler = "nft"
 
 [[redirects]]
   from = "/*"
