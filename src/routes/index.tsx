@@ -1,11 +1,20 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Play, Pencil, Trash2, Languages } from "lucide-react";
+import { Plus, Play, Pencil, Trash2, Languages, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { addLanguage, deleteLanguage, getLanguages } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
+import { RequireAuth } from "@/components/require-auth";
 
 export const Route = createFileRoute("/")({
+  beforeLoad: async () => {
+    if (typeof window === "undefined") return;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw redirect({ to: "/login" });
+  },
   head: () => ({
     meta: [
       { title: "Flashcards — Learn languages" },
@@ -16,8 +25,14 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: languages = [], isLoading } = useQuery({ queryKey: ["languages"], queryFn: getLanguages });
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/login" });
+  };
 
   const addMutation = useMutation({
     mutationFn: addLanguage,
@@ -44,12 +59,23 @@ function Home() {
   };
 
   return (
+    <RequireAuth>
     <div className="min-h-dvh flex justify-center">
       <div className="w-full max-w-[420px] px-5 pt-10 pb-24">
         <header className="mb-8">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">
-            <Languages className="w-3.5 h-3.5" />
-            Flashcards
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              <Languages className="w-3.5 h-3.5" />
+              Flashcards
+            </div>
+            <button
+              onClick={signOut}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Sign out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign out
+            </button>
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Your languages</h1>
           <p className="text-sm text-muted-foreground mt-1">Tap a card to play or edit.</p>
@@ -184,5 +210,6 @@ function Home() {
         </div>
       </div>
     </div>
+    </RequireAuth>
   );
 }

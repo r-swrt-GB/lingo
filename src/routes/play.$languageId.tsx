@@ -1,11 +1,20 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowLeft, Check, X, Trophy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getLanguage, updateHighScore, type Word } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
+import { RequireAuth } from "@/components/require-auth";
 
 export const Route = createFileRoute("/play/$languageId")({
+  beforeLoad: async () => {
+    if (typeof window === "undefined") return;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw redirect({ to: "/login" });
+  },
   component: PlayLanguage,
 });
 
@@ -32,6 +41,14 @@ function buildSession(words: Word[]): Question[] {
 }
 
 function PlayLanguage() {
+  return (
+    <RequireAuth>
+      <PlayLanguageInner />
+    </RequireAuth>
+  );
+}
+
+function PlayLanguageInner() {
   const { languageId } = Route.useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();

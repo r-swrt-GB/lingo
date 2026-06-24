@@ -1,11 +1,20 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { addWord, deleteWord, getLanguage } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
+import { RequireAuth } from "@/components/require-auth";
 
 export const Route = createFileRoute("/edit/$languageId")({
+  beforeLoad: async () => {
+    if (typeof window === "undefined") return;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw redirect({ to: "/login" });
+  },
   component: EditLanguage,
 });
 
@@ -78,6 +87,7 @@ function EditLanguage() {
   };
 
   return (
+    <RequireAuth>
     <div className="min-h-dvh flex justify-center">
       <div className="w-full max-w-[420px] px-5 pt-8 pb-32">
         <Link
@@ -153,5 +163,6 @@ function EditLanguage() {
         </form>
       </div>
     </div>
+    </RequireAuth>
   );
 }
