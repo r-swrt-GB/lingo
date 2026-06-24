@@ -10,20 +10,6 @@
   directory = "netlify/functions"
   node_bundler = "nft"
 
-# Serve static assets directly from CDN — must come before the function catch-all
-# because Netlify function rewrites always proxy regardless of force = false
-[[redirects]]
-  from = "/assets/*"
-  to = "/assets/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/images/*"
-  to = "/images/:splat"
-  status = 200
-
-# All other requests go to the SSR function
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/server"
-  status = 200
+# No redirects needed: the SSR function declares `path: "/*"` (with
+# `/assets/*` and `/images/*` excluded) in server.mjs, which handles all
+# routing. Static assets are served directly from the CDN.
