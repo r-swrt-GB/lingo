@@ -21,9 +21,6 @@ dist-ssr
 .env.*
 !.env.example
 
-# Netlify build artifacts
-netlify/functions/server-dist
-
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
