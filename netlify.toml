@@ -1,0 +1,29 @@
+[build]
+  command = "bun run build && cp -r dist/server netlify/functions/server-dist"
+  publish = "dist/client"
+
+[build.environment]
+  BUN_VERSION = "1.2.0"
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "nft"
+
+# Serve static assets directly from CDN — must come before the function catch-all
+# because Netlify function rewrites always proxy regardless of force = false
+[[redirects]]
+  from = "/assets/*"
+  to = "/assets/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/images/*"
+  to = "/images/:splat"
+  status = 200
+
+# All other requests go to the SSR function
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/server"
+  status = 200
