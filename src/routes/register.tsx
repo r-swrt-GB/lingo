@@ -96,6 +96,9 @@ function Register() {
             {loading ? "Creating account…" : "Create account"}
           </button>
         </form>
+        <p className="mt-8 text-center text-xs italic text-muted-foreground">
+          Powered by one of Anna's good ideas.
+        </p>
       </div>
     </div>
   );
