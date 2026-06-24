@@ -1,6 +1,5 @@
 import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Languages } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/login")({
@@ -37,10 +36,7 @@ function Login() {
   return (
     <div className="min-h-dvh flex items-center justify-center px-5">
       <div className="w-full max-w-[360px]">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground mb-6">
-          <Languages className="w-3.5 h-3.5" />
-          Flashcards
-        </div>
+        <img src="/images/logo_with_mascot.png" alt="Lingo" className="h-28 mx-auto mb-14" />
         <h1 className="text-3xl font-bold tracking-tight mb-1">Sign in</h1>
         <p className="text-sm text-muted-foreground mb-8">
           No account?{" "}

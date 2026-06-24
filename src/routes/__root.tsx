@@ -73,14 +73,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Flashcards — Learn languages" },
+      { title: "Lingo" },
       { name: "description", content: "Mobile-first flashcard quizzes for any language you want to learn." },
-      { property: "og:title", content: "Flashcards — Learn languages" },
+      { property: "og:title", content: "Lingo" },
       { property: "og:description", content: "Mobile-first flashcard quizzes for any language you want to learn." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
     links: [
+      {
+        rel: "icon",
+        href: "/images/favicon.ico",
+        type: "image/x-icon",
+      },
       {
         rel: "preconnect",
         href: "https://fonts.googleapis.com",

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Play, Pencil, Trash2, Languages, LogOut } from "lucide-react";
+import { Plus, Play, Pencil, Trash2, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { addLanguage, deleteLanguage, getLanguages } from "@/lib/storage";
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/")({
   },
   head: () => ({
     meta: [
-      { title: "Flashcards — Learn languages" },
+      { title: "Lingo" },
       { name: "description", content: "Mobile-first flashcard quizzes for any language you want to learn." },
     ],
   }),
@@ -64,10 +64,7 @@ function Home() {
       <div className="w-full max-w-[420px] px-5 pt-10 pb-24">
         <header className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              <Languages className="w-3.5 h-3.5" />
-              Flashcards
-            </div>
+            <img src="/images/logo.png" alt="Lingo" className="h-10" />
             <button
               onClick={signOut}
               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -77,7 +74,7 @@ function Home() {
               Sign out
             </button>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Your languages</h1>
+          <h1 className="text-3xl font-bold tracking-tight mt-6">Your languages</h1>
           <p className="text-sm text-muted-foreground mt-1">Tap a card to play or edit.</p>
         </header>
 

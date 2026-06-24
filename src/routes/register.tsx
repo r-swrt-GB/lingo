@@ -1,6 +1,5 @@
 import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Languages } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/register")({
@@ -41,10 +40,7 @@ function Register() {
     return (
       <div className="min-h-dvh flex items-center justify-center px-5">
         <div className="w-full max-w-[360px] text-center">
-          <div className="flex items-center justify-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground mb-6">
-            <Languages className="w-3.5 h-3.5" />
-            Flashcards
-          </div>
+          <img src="/images/logo_with_mascot.png" alt="Lingo" className="h-28 mx-auto mb-14" />
           <h1 className="text-2xl font-bold tracking-tight mb-2">Check your email</h1>
           <p className="text-sm text-muted-foreground mb-6">
             We sent a confirmation link to <span className="text-foreground font-medium">{email}</span>. Open it to
@@ -64,10 +60,7 @@ function Register() {
   return (
     <div className="min-h-dvh flex items-center justify-center px-5">
       <div className="w-full max-w-[360px]">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground mb-6">
-          <Languages className="w-3.5 h-3.5" />
-          Flashcards
-        </div>
+        <img src="/images/logo_with_mascot.png" alt="Lingo" className="h-28 mx-auto mb-14" />
         <h1 className="text-3xl font-bold tracking-tight mb-1">Create account</h1>
         <p className="text-sm text-muted-foreground mb-8">
           Already have one?{" "}
