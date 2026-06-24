@@ -2,26 +2,60 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { addWord, deleteWord, getLanguage, useStore } from "@/lib/storage";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { addWord, deleteWord, getLanguage } from "@/lib/storage";
 
 export const Route = createFileRoute("/edit/$languageId")({
   component: EditLanguage,
-
 });
 
 function EditLanguage() {
   const { languageId } = Route.useParams();
   const navigate = useNavigate();
-  const lang = useStore(() => getLanguage(languageId));
+  const queryClient = useQueryClient();
+
+  const { data: lang, isLoading } = useQuery({
+    queryKey: ["language", languageId],
+    queryFn: () => getLanguage(languageId),
+  });
+
+  const addWordMutation = useMutation({
+    mutationFn: ({ target, english }: { target: string; english: string }) =>
+      addWord(languageId, target, english),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["language", languageId] });
+      queryClient.invalidateQueries({ queryKey: ["languages"] });
+    },
+  });
+
+  const deleteWordMutation = useMutation({
+    mutationFn: (wordId: string) => deleteWord(wordId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["language", languageId] });
+      queryClient.invalidateQueries({ queryKey: ["languages"] });
+    },
+  });
+
   const [target, setTarget] = useState("");
   const [english, setEnglish] = useState("");
+
+  if (isLoading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   if (!lang) {
     return (
       <div className="min-h-dvh flex items-center justify-center px-5">
         <div className="text-center">
           <p className="text-sm text-muted-foreground mb-4">Language not found.</p>
-          <button onClick={() => navigate({ to: "/" })} className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm">
+          <button
+            onClick={() => navigate({ to: "/" })}
+            className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm"
+          >
             Go home
           </button>
         </div>
@@ -32,15 +66,24 @@ function EditLanguage() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!target.trim() || !english.trim()) return;
-    addWord(lang.id, target, english);
-    setTarget("");
-    setEnglish("");
+    addWordMutation.mutate(
+      { target, english },
+      {
+        onSuccess: () => {
+          setTarget("");
+          setEnglish("");
+        },
+      },
+    );
   };
 
   return (
     <div className="min-h-dvh flex justify-center">
       <div className="w-full max-w-[420px] px-5 pt-8 pb-32">
-        <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground mb-6 hover:text-foreground">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground mb-6 hover:text-foreground"
+        >
           <ArrowLeft className="w-4 h-4" /> Back
         </Link>
 
@@ -69,7 +112,7 @@ function EditLanguage() {
                   <span className="text-sm text-muted-foreground truncate">{w.english}</span>
                 </div>
                 <button
-                  onClick={() => deleteWord(lang.id, w.id)}
+                  onClick={() => deleteWordMutation.mutate(w.id)}
                   className="text-muted-foreground hover:text-foreground p-1 -m-1 shrink-0"
                   aria-label="Delete word"
                 >
@@ -102,9 +145,10 @@ function EditLanguage() {
           />
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground font-medium py-3 active:scale-[0.98] transition-transform"
+            disabled={addWordMutation.isPending}
+            className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground font-medium py-3 active:scale-[0.98] transition-transform disabled:opacity-50"
           >
-            <Plus className="w-4 h-4" /> Add
+            <Plus className="w-4 h-4" /> {addWordMutation.isPending ? "Adding…" : "Add"}
           </button>
         </form>
       </div>

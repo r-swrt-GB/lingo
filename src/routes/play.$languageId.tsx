@@ -2,11 +2,11 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowLeft, Check, X, Trophy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getLanguage, updateHighScore, useStore, type Word } from "@/lib/storage";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getLanguage, updateHighScore, type Word } from "@/lib/storage";
 
 export const Route = createFileRoute("/play/$languageId")({
   component: PlayLanguage,
-
 });
 
 function shuffle<T>(arr: T[]): T[] {
@@ -34,10 +34,28 @@ function buildSession(words: Word[]): Question[] {
 function PlayLanguage() {
   const { languageId } = Route.useParams();
   const navigate = useNavigate();
-  const lang = useStore(() => getLanguage(languageId));
+  const queryClient = useQueryClient();
+
+  const { data: lang, isLoading } = useQuery({
+    queryKey: ["language", languageId],
+    queryFn: () => getLanguage(languageId),
+  });
+
+  const highScoreMutation = useMutation({
+    mutationFn: ({ score, currentHigh }: { score: number; currentHigh: number }) =>
+      updateHighScore(languageId, score, currentHigh),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["language", languageId] });
+      queryClient.invalidateQueries({ queryKey: ["languages"] });
+    },
+  });
 
   const [seed, setSeed] = useState(0);
-  const questions = useMemo(() => (lang ? buildSession(lang.words) : []), [lang?.id, seed, lang?.words.length]);
+  const questions = useMemo(
+    () => (lang ? buildSession(lang.words) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lang?.id, seed, lang?.words.length],
+  );
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -45,10 +63,21 @@ function PlayLanguage() {
   const [finished, setFinished] = useState(false);
   const [newHigh, setNewHigh] = useState(false);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
   if (!lang) {
     return (
       <div className="min-h-dvh flex items-center justify-center px-5">
-        <button onClick={() => navigate({ to: "/" })} className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm">
+        <button
+          onClick={() => navigate({ to: "/" })}
+          className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm"
+        >
           Go home
         </button>
       </div>
@@ -60,7 +89,11 @@ function PlayLanguage() {
       <div className="min-h-dvh flex items-center justify-center px-5">
         <div className="text-center max-w-[320px]">
           <p className="text-sm text-muted-foreground mb-4">Add at least 5 words to play.</p>
-          <Link to="/edit/$languageId" params={{ languageId: lang.id }} className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm">
+          <Link
+            to="/edit/$languageId"
+            params={{ languageId: lang.id }}
+            className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm"
+          >
             Add words
           </Link>
         </div>
@@ -81,9 +114,11 @@ function PlayLanguage() {
 
   const next = () => {
     if (index + 1 >= total) {
-      const finalScore = score;
-      const beat = updateHighScore(lang.id, finalScore);
-      setNewHigh(beat);
+      const finalScore = submitted && selected === current.word.english ? score + 1 : score;
+      highScoreMutation.mutate(
+        { score: finalScore, currentHigh: lang.highScore },
+        { onSuccess: (beat) => setNewHigh(!!beat) },
+      );
       setFinished(true);
     } else {
       setIndex((i) => i + 1);
@@ -103,10 +138,14 @@ function PlayLanguage() {
   };
 
   if (finished) {
+    const finalScore = score;
     return (
       <div className="min-h-dvh flex justify-center">
         <div className="w-full max-w-[420px] px-5 pt-8 pb-12 flex flex-col">
-          <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground mb-10 hover:text-foreground">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground mb-10 hover:text-foreground"
+          >
             <ArrowLeft className="w-4 h-4" /> Home
           </Link>
           <motion.div
@@ -116,11 +155,12 @@ function PlayLanguage() {
           >
             <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground mb-3">Session complete</div>
             <div className="text-7xl font-bold tracking-tight">
-              {score}<span className="text-muted-foreground">/{total}</span>
+              {finalScore}
+              <span className="text-muted-foreground">/{total}</span>
             </div>
             <div className="mt-6 flex items-center gap-2 text-sm">
               <Trophy className="w-4 h-4" />
-              <span>High score: {Math.max(score, lang.highScore)}</span>
+              <span>High score: {Math.max(finalScore, lang.highScore)}</span>
             </div>
             {newHigh && (
               <motion.div
@@ -155,7 +195,10 @@ function PlayLanguage() {
     <div className="min-h-dvh flex justify-center">
       <div className="w-full max-w-[420px] px-5 pt-6 pb-8 flex flex-col min-h-dvh">
         <div className="flex items-center justify-between mb-2">
-          <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div className="text-sm font-medium">{lang.name}</div>
@@ -165,13 +208,15 @@ function PlayLanguage() {
         </div>
 
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-6">
-          <span>Score: <span className="text-foreground font-medium tabular-nums">{score}</span></span>
+          <span>
+            Score: <span className="text-foreground font-medium tabular-nums">{score}</span>
+          </span>
           <span className="inline-flex items-center gap-1">
-            <Trophy className="w-3 h-3" /> High: <span className="text-foreground font-medium tabular-nums">{lang.highScore}</span>
+            <Trophy className="w-3 h-3" /> High:{" "}
+            <span className="text-foreground font-medium tabular-nums">{lang.highScore}</span>
           </span>
         </div>
 
-        {/* Progress */}
         <div className="h-0.5 bg-muted rounded-full overflow-hidden mb-10">
           <motion.div
             className="h-full bg-primary"
@@ -181,7 +226,6 @@ function PlayLanguage() {
           />
         </div>
 
-        {/* Word */}
         <AnimatePresence mode="wait">
           <motion.div
             key={current.word.id}
@@ -190,8 +234,8 @@ function PlayLanguage() {
               submitted && selected !== current.word.english
                 ? { opacity: 1, y: 0, x: [0, -8, 8, -6, 6, 0] }
                 : submitted && selected === current.word.english
-                ? { opacity: 1, y: [0, -6, 0], scale: [1, 1.05, 1] }
-                : { opacity: 1, y: 0 }
+                  ? { opacity: 1, y: [0, -6, 0], scale: [1, 1.05, 1] }
+                  : { opacity: 1, y: 0 }
             }
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.4 }}
@@ -202,7 +246,6 @@ function PlayLanguage() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Options */}
         <div className="space-y-2.5 flex-1">
           {current.options.map((opt) => {
             const isSelected = selected === opt;
@@ -224,7 +267,9 @@ function PlayLanguage() {
               >
                 <span className="flex-1">{opt}</span>
                 {submitted && isCorrect && <Check className="w-5 h-5 text-[color:var(--color-success)] shrink-0" />}
-                {submitted && isSelected && !isCorrect && <X className="w-5 h-5 text-[color:var(--color-error)] shrink-0" />}
+                {submitted && isSelected && !isCorrect && (
+                  <X className="w-5 h-5 text-[color:var(--color-error)] shrink-0" />
+                )}
               </button>
             );
           })}
