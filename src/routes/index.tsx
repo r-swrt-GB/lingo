@@ -121,12 +121,12 @@ function Home() {
                         </p>
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
-                        {(lang.myRole === "owner" || lang.myRole === "editor") && (
+                        {lang.myRole === "owner" && (
                           <Link
                             to="/edit/$languageId"
                             params={{ languageId: lang.id }}
                             className="text-muted-foreground hover:text-foreground p-1"
-                            aria-label="Edit language"
+                            aria-label="Manage members"
                           >
                             <Pencil className="w-4 h-4" />
                           </Link>

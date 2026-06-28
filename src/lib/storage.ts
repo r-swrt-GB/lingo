@@ -169,6 +169,42 @@ export async function deleteWord(wordId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function addWordInDeck(languageId: string, deckId: string, target: string, english: string): Promise<void> {
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from("words")
+    .insert({ language_id: languageId, user_id: userId, target: target.trim(), english: english.trim() })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const { error: dwError } = await supabase
+    .from("deck_words")
+    .insert({ deck_id: deckId, word_id: data.id as string });
+  if (dwError) throw dwError;
+}
+
+export async function addWordsInDeck(
+  languageId: string,
+  deckId: string,
+  words: { target: string; english: string }[],
+): Promise<void> {
+  if (words.length === 0) return;
+  const userId = await getUserId();
+  const rows = words.map((w) => ({
+    language_id: languageId,
+    user_id: userId,
+    target: w.target.trim(),
+    english: w.english.trim(),
+  }));
+  const { data, error } = await supabase.from("words").insert(rows).select("id");
+  if (error) throw error;
+  const dwRows = (data ?? []).map((r) => ({ deck_id: deckId, word_id: r.id as string }));
+  if (dwRows.length > 0) {
+    const { error: dwError } = await supabase.from("deck_words").insert(dwRows);
+    if (dwError) throw dwError;
+  }
+}
+
 // --- Decks ---
 
 export async function getDecks(languageId: string): Promise<Deck[]> {

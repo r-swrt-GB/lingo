@@ -1,6 +1,6 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Layers, Pencil, Play, Plus, Trash2, Trophy } from "lucide-react";
+import { ArrowLeft, Layers, Pencil, Play, Plus, Settings, Trash2, Trophy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { addDeck, deleteDeck, getDecks, getLanguage } from "@/lib/storage";
@@ -99,14 +99,14 @@ function LanguagePageInner() {
         <header className="mb-8">
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-3xl font-bold tracking-tight">{lang.name}</h1>
-            {canEdit && (
+            {lang.myRole === "owner" && (
               <Link
                 to="/edit/$languageId"
                 params={{ languageId }}
                 className="text-muted-foreground hover:text-foreground p-1 shrink-0"
-                aria-label="Edit language"
+                aria-label="Manage members"
               >
-                <Pencil className="w-4 h-4" />
+                <Settings className="w-4 h-4" />
               </Link>
             )}
           </div>
@@ -160,6 +160,16 @@ function LanguagePageInner() {
                       >
                         <Trophy className="w-4 h-4" />
                       </Link>
+                      {canEdit && (
+                        <Link
+                          to="/edit/$languageId/$deckId"
+                          params={{ languageId, deckId: deck.id }}
+                          className="text-muted-foreground hover:text-foreground p-1"
+                          aria-label="Edit deck"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Link>
+                      )}
                       {canEdit && (
                         <button
                           onClick={() => {

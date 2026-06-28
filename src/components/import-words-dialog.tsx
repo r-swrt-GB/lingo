@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { addWords, type Word } from "@/lib/storage";
+import { addWords, addWordsInDeck, type Word } from "@/lib/storage";
 
 type Summary = {
   imported: number;
@@ -19,12 +19,13 @@ type Summary = {
 
 type Props = {
   languageId: string;
+  deckId?: string;
   languageName: string;
   existingWords: Word[];
   onImported: () => void;
 };
 
-export function ImportWordsDialog({ languageId, languageName, existingWords, onImported }: Props) {
+export function ImportWordsDialog({ languageId, deckId, languageName, existingWords, onImported }: Props) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +89,11 @@ export function ImportWordsDialog({ languageId, languageName, existingWords, onI
         toAdd.push({ target, english });
       }
 
-      await addWords(languageId, toAdd);
+      if (deckId) {
+        await addWordsInDeck(languageId, deckId, toAdd);
+      } else {
+        await addWords(languageId, toAdd);
+      }
       if (toAdd.length > 0) onImported();
       setSummary({ imported: toAdd.length, duplicates, skipped });
     } catch (err) {
