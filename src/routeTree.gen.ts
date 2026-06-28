@@ -10,14 +10,21 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlayLanguageIdRouteImport } from './routes/play.$languageId'
+import { Route as LeaderboardLanguageIdRouteImport } from './routes/leaderboard.$languageId'
 import { Route as EditLanguageIdRouteImport } from './routes/edit.$languageId'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -35,6 +42,11 @@ const PlayLanguageIdRoute = PlayLanguageIdRouteImport.update({
   path: '/play/$languageId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LeaderboardLanguageIdRoute = LeaderboardLanguageIdRouteImport.update({
+  id: '/leaderboard/$languageId',
+  path: '/leaderboard/$languageId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EditLanguageIdRoute = EditLanguageIdRouteImport.update({
   id: '/edit/$languageId',
   path: '/edit/$languageId',
@@ -44,23 +56,29 @@ const EditLanguageIdRoute = EditLanguageIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/edit/$languageId': typeof EditLanguageIdRoute
+  '/leaderboard/$languageId': typeof LeaderboardLanguageIdRoute
   '/play/$languageId': typeof PlayLanguageIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/edit/$languageId': typeof EditLanguageIdRoute
+  '/leaderboard/$languageId': typeof LeaderboardLanguageIdRoute
   '/play/$languageId': typeof PlayLanguageIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/edit/$languageId': typeof EditLanguageIdRoute
+  '/leaderboard/$languageId': typeof LeaderboardLanguageIdRoute
   '/play/$languageId': typeof PlayLanguageIdRoute
 }
 export interface FileRouteTypes {
@@ -68,25 +86,38 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/profile'
     | '/register'
     | '/edit/$languageId'
+    | '/leaderboard/$languageId'
     | '/play/$languageId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/register' | '/edit/$languageId' | '/play/$languageId'
+  to:
+    | '/'
+    | '/login'
+    | '/profile'
+    | '/register'
+    | '/edit/$languageId'
+    | '/leaderboard/$languageId'
+    | '/play/$languageId'
   id:
     | '__root__'
     | '/'
     | '/login'
+    | '/profile'
     | '/register'
     | '/edit/$languageId'
+    | '/leaderboard/$languageId'
     | '/play/$languageId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
   EditLanguageIdRoute: typeof EditLanguageIdRoute
+  LeaderboardLanguageIdRoute: typeof LeaderboardLanguageIdRoute
   PlayLanguageIdRoute: typeof PlayLanguageIdRoute
 }
 
@@ -97,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -120,6 +158,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlayLanguageIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/leaderboard/$languageId': {
+      id: '/leaderboard/$languageId'
+      path: '/leaderboard/$languageId'
+      fullPath: '/leaderboard/$languageId'
+      preLoaderRoute: typeof LeaderboardLanguageIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/edit/$languageId': {
       id: '/edit/$languageId'
       path: '/edit/$languageId'
@@ -133,8 +178,10 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
   EditLanguageIdRoute: EditLanguageIdRoute,
+  LeaderboardLanguageIdRoute: LeaderboardLanguageIdRoute,
   PlayLanguageIdRoute: PlayLanguageIdRoute,
 }
 export const routeTree = rootRouteImport

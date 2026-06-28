@@ -6,6 +6,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { addWord, deleteWord, getLanguage } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
 import { RequireAuth } from "@/components/require-auth";
+import { ImportWordsDialog } from "@/components/import-words-dialog";
+import { InviteTab } from "@/components/invite-tab";
 
 export const Route = createFileRoute("/edit/$languageId")({
   beforeLoad: async () => {
@@ -47,6 +49,7 @@ function EditLanguage() {
 
   const [target, setTarget] = useState("");
   const [english, setEnglish] = useState("");
+  const [tab, setTab] = useState<"words" | "invite">("words");
 
   if (isLoading) {
     return (
@@ -67,6 +70,26 @@ function EditLanguage() {
           >
             Go home
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isOwner = lang.myRole === "owner";
+  const canEdit = isOwner || lang.myRole === "editor";
+
+  if (!canEdit) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center px-5">
+        <div className="text-center max-w-[320px]">
+          <p className="text-sm text-muted-foreground mb-4">You don't have edit access to this language.</p>
+          <Link
+            to="/play/$languageId"
+            params={{ languageId: lang.id }}
+            className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm"
+          >
+            Play instead
+          </Link>
         </div>
       </div>
     );
@@ -105,6 +128,26 @@ function EditLanguage() {
           </p>
         </header>
 
+        {isOwner && (
+          <div className="flex gap-1 mb-6 rounded-xl border border-border bg-card p-1">
+            {(["words", "invite"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`flex-1 rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
+                  tab === t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isOwner && tab === "invite" && <InviteTab languageId={lang.id} isPublic={lang.isPublic} />}
+
+        {(!isOwner || tab === "words") && (
+        <>
         <section className="space-y-2 mb-8">
           <AnimatePresence initial={false}>
             {lang.words.map((w) => (
@@ -138,6 +181,18 @@ function EditLanguage() {
           )}
         </section>
 
+        <div className="mb-3">
+          <ImportWordsDialog
+            languageId={lang.id}
+            languageName={lang.name}
+            existingWords={lang.words}
+            onImported={() => {
+              queryClient.invalidateQueries({ queryKey: ["language", languageId] });
+              queryClient.invalidateQueries({ queryKey: ["languages"] });
+            }}
+          />
+        </div>
+
         <form onSubmit={submit} className="rounded-xl border border-border bg-card p-3 space-y-2">
           <input
             value={target}
@@ -161,6 +216,8 @@ function EditLanguage() {
             <Plus className="w-4 h-4" /> {addWordMutation.isPending ? "Adding…" : "Add"}
           </button>
         </form>
+        </>
+        )}
       </div>
     </div>
     </RequireAuth>

@@ -1,9 +1,10 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Check, X, Trophy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getLanguage, updateHighScore, type Word } from "@/lib/storage";
+import { getLanguage, submitScore, updateHighScore, type Word } from "@/lib/storage";
+import { clearProgress, loadProgress, saveProgress, type Question } from "@/lib/progress";
 import { supabase } from "@/lib/supabase";
 import { RequireAuth } from "@/components/require-auth";
 
@@ -26,8 +27,6 @@ function shuffle<T>(arr: T[]): T[] {
   }
   return a;
 }
-
-type Question = { word: Word; options: string[] };
 
 function buildSession(words: Word[]): Question[] {
   const order = shuffle(words);
@@ -67,18 +66,33 @@ function PlayLanguageInner() {
     },
   });
 
-  const [seed, setSeed] = useState(0);
-  const questions = useMemo(
-    () => (lang ? buildSession(lang.words) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lang?.id, seed, lang?.words.length],
-  );
+  const scoreMutation = useMutation({
+    mutationFn: (score: number) => submitScore(languageId, score),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leaderboard", languageId] }),
+  });
+
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
   const [newHigh, setNewHigh] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  // Resume a saved session if one exists for this language, otherwise start fresh.
+  useEffect(() => {
+    if (!lang || ready) return;
+    const saved = loadProgress(lang.id, lang.words);
+    if (saved) {
+      setQuestions(saved.questions);
+      setIndex(saved.index);
+      setScore(saved.score);
+    } else {
+      setQuestions(buildSession(lang.words));
+    }
+    setReady(true);
+  }, [lang, ready]);
 
   if (isLoading) {
     return (
@@ -118,6 +132,14 @@ function PlayLanguageInner() {
     );
   }
 
+  if (!ready || questions.length === 0) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
   const total = questions.length;
   const current = questions[index];
 
@@ -132,20 +154,29 @@ function PlayLanguageInner() {
   const next = () => {
     if (index + 1 >= total) {
       const finalScore = submitted && selected === current.word.english ? score + 1 : score;
-      highScoreMutation.mutate(
-        { score: finalScore, currentHigh: lang.highScore },
-        { onSuccess: (beat) => setNewHigh(!!beat) },
-      );
+      // Only owners/editors may update the language's shared high score; viewers
+      // can still play and record their personal best on the leaderboard.
+      if (lang.myRole === "owner" || lang.myRole === "editor") {
+        highScoreMutation.mutate(
+          { score: finalScore, currentHigh: lang.highScore },
+          { onSuccess: (beat) => setNewHigh(!!beat) },
+        );
+      }
+      scoreMutation.mutate(finalScore);
+      clearProgress(lang.id);
       setFinished(true);
     } else {
-      setIndex((i) => i + 1);
+      const nextIndex = index + 1;
+      setIndex(nextIndex);
       setSelected(null);
       setSubmitted(false);
+      saveProgress(lang.id, { questions, index: nextIndex, score });
     }
   };
 
   const playAgain = () => {
-    setSeed((s) => s + 1);
+    clearProgress(lang.id);
+    setQuestions(buildSession(lang.words));
     setIndex(0);
     setSelected(null);
     setSubmitted(false);
@@ -195,6 +226,13 @@ function PlayLanguageInner() {
               >
                 Play again
               </button>
+              <Link
+                to="/leaderboard/$languageId"
+                params={{ languageId: lang.id }}
+                className="block w-full rounded-xl border border-border font-medium py-3.5 text-center"
+              >
+                Leaderboard
+              </Link>
               <Link
                 to="/"
                 className="block w-full rounded-xl border border-border font-medium py-3.5 text-center"

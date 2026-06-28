@@ -1,6 +1,7 @@
 import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { isUsernameTaken } from "@/lib/storage";
 
 export const Route = createFileRoute("/register")({
   beforeLoad: async () => {
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/register")({
 
 function Register() {
   const navigate = useNavigate();
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +27,22 @@ function Register() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({ email, password });
+
+    try {
+      if (await isUsernameTaken(username)) {
+        setError("That username is already taken.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      // If the check fails (e.g. offline), let signup proceed; the DB constraint is the backstop.
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { username: username.trim() } },
+    });
     setLoading(false);
     if (error) {
       setError(error.message);
@@ -70,9 +87,19 @@ function Register() {
         </p>
         <form onSubmit={submit} className="space-y-3">
           <input
-            type="email"
+            type="text"
             required
             autoFocus
+            minLength={2}
+            maxLength={20}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Username"
+            className="w-full rounded-xl border border-border bg-card px-4 py-3 text-base outline-none placeholder:text-muted-foreground focus:border-foreground transition-colors"
+          />
+          <input
+            type="email"
+            required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
