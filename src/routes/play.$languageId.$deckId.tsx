@@ -1,14 +1,14 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, X, Trophy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getLanguage, submitScore, updateHighScore, type Word } from "@/lib/storage";
+import { getDeck, getDeckWords, submitScore, type Word } from "@/lib/storage";
 import { clearProgress, loadProgress, saveProgress, type Question } from "@/lib/progress";
 import { supabase } from "@/lib/supabase";
 import { RequireAuth } from "@/components/require-auth";
 
-export const Route = createFileRoute("/play/$languageId")({
+export const Route = createFileRoute("/play/$languageId/$deckId")({
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
     const {
@@ -16,7 +16,7 @@ export const Route = createFileRoute("/play/$languageId")({
     } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
   },
-  component: PlayLanguage,
+  component: PlayDeck,
 });
 
 function shuffle<T>(arr: T[]): T[] {
@@ -39,36 +39,38 @@ function buildSession(words: Word[]): Question[] {
   });
 }
 
-function PlayLanguage() {
+function PlayDeck() {
   return (
     <RequireAuth>
-      <PlayLanguageInner />
+      <PlayDeckInner />
     </RequireAuth>
   );
 }
 
-function PlayLanguageInner() {
-  const { languageId } = Route.useParams();
+function PlayDeckInner() {
+  const { languageId, deckId } = Route.useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const prevHighScore = useRef(0);
 
-  const { data: lang, isLoading } = useQuery({
-    queryKey: ["language", languageId],
-    queryFn: () => getLanguage(languageId),
+  const { data: deck, isLoading: deckLoading } = useQuery({
+    queryKey: ["deck", deckId],
+    queryFn: () => getDeck(deckId),
   });
 
-  const highScoreMutation = useMutation({
-    mutationFn: ({ score, currentHigh }: { score: number; currentHigh: number }) =>
-      updateHighScore(languageId, score, currentHigh),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["language", languageId] });
-      queryClient.invalidateQueries({ queryKey: ["languages"] });
-    },
+  const { data: words = [], isLoading: wordsLoading } = useQuery({
+    queryKey: ["deck-words", deckId],
+    queryFn: () => getDeckWords(deckId),
   });
 
   const scoreMutation = useMutation({
-    mutationFn: (score: number) => submitScore(languageId, score),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leaderboard", languageId] }),
+    mutationFn: (score: number) => submitScore(deckId, score),
+    onSuccess: (isNewBest) => {
+      queryClient.invalidateQueries({ queryKey: ["deck", deckId] });
+      queryClient.invalidateQueries({ queryKey: ["decks", languageId] });
+      queryClient.invalidateQueries({ queryKey: ["leaderboard", deckId] });
+      if (isNewBest) setNewHigh(true);
+    },
   });
 
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -80,21 +82,27 @@ function PlayLanguageInner() {
   const [newHigh, setNewHigh] = useState(false);
   const [ready, setReady] = useState(false);
 
-  // Resume a saved session if one exists for this language, otherwise start fresh.
+  // Capture the user's high score before the game starts.
   useEffect(() => {
-    if (!lang || ready) return;
-    const saved = loadProgress(lang.id, lang.words);
+    if (deck && !ready) {
+      prevHighScore.current = deck.myHighScore;
+    }
+  }, [deck, ready]);
+
+  useEffect(() => {
+    if (words.length === 0 || ready) return;
+    const saved = loadProgress(deckId, words);
     if (saved) {
       setQuestions(saved.questions);
       setIndex(saved.index);
       setScore(saved.score);
     } else {
-      setQuestions(buildSession(lang.words));
+      setQuestions(buildSession(words));
     }
     setReady(true);
-  }, [lang, ready]);
+  }, [words, deckId, ready]);
 
-  if (isLoading) {
+  if (deckLoading || wordsLoading) {
     return (
       <div className="min-h-dvh flex items-center justify-center">
         <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -102,30 +110,33 @@ function PlayLanguageInner() {
     );
   }
 
-  if (!lang) {
+  if (!deck) {
     return (
       <div className="min-h-dvh flex items-center justify-center px-5">
-        <button
-          onClick={() => navigate({ to: "/" })}
-          className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm"
-        >
-          Go home
-        </button>
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground mb-4">Deck not found.</p>
+          <button
+            onClick={() => navigate({ to: "/language/$languageId", params: { languageId } })}
+            className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm"
+          >
+            Go back
+          </button>
+        </div>
       </div>
     );
   }
 
-  if (lang.words.length < 5) {
+  if (words.length < 4) {
     return (
       <div className="min-h-dvh flex items-center justify-center px-5">
         <div className="text-center max-w-[320px]">
-          <p className="text-sm text-muted-foreground mb-4">Add at least 5 words to play.</p>
+          <p className="text-sm text-muted-foreground mb-4">Add at least 4 words to this deck to play.</p>
           <Link
             to="/edit/$languageId"
-            params={{ languageId: lang.id }}
+            params={{ languageId }}
             className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm"
           >
-            Add words
+            Edit language
           </Link>
         </div>
       </div>
@@ -154,29 +165,22 @@ function PlayLanguageInner() {
   const next = () => {
     if (index + 1 >= total) {
       const finalScore = submitted && selected === current.word.english ? score + 1 : score;
-      // Only owners/editors may update the language's shared high score; viewers
-      // can still play and record their personal best on the leaderboard.
-      if (lang.myRole === "owner" || lang.myRole === "editor") {
-        highScoreMutation.mutate(
-          { score: finalScore, currentHigh: lang.highScore },
-          { onSuccess: (beat) => setNewHigh(!!beat) },
-        );
-      }
       scoreMutation.mutate(finalScore);
-      clearProgress(lang.id);
+      clearProgress(deckId);
       setFinished(true);
     } else {
       const nextIndex = index + 1;
       setIndex(nextIndex);
       setSelected(null);
       setSubmitted(false);
-      saveProgress(lang.id, { questions, index: nextIndex, score });
+      saveProgress(deckId, { questions, index: nextIndex, score });
     }
   };
 
   const playAgain = () => {
-    clearProgress(lang.id);
-    setQuestions(buildSession(lang.words));
+    clearProgress(deckId);
+    prevHighScore.current = Math.max(prevHighScore.current, score);
+    setQuestions(buildSession(words));
     setIndex(0);
     setSelected(null);
     setSubmitted(false);
@@ -187,14 +191,16 @@ function PlayLanguageInner() {
 
   if (finished) {
     const finalScore = score;
+    const bestScore = Math.max(finalScore, prevHighScore.current);
     return (
       <div className="min-h-dvh flex justify-center">
         <div className="w-full max-w-[420px] px-5 pt-8 pb-12 flex flex-col">
           <Link
-            to="/"
+            to="/language/$languageId"
+            params={{ languageId }}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground mb-10 hover:text-foreground"
           >
-            <ArrowLeft className="w-4 h-4" /> Home
+            <ArrowLeft className="w-4 h-4" /> Back
           </Link>
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -208,7 +214,7 @@ function PlayLanguageInner() {
             </div>
             <div className="mt-6 flex items-center gap-2 text-sm">
               <Trophy className="w-4 h-4" />
-              <span>High score: {Math.max(finalScore, lang.highScore)}</span>
+              <span>High score: {bestScore}</span>
             </div>
             {newHigh && (
               <motion.div
@@ -227,17 +233,18 @@ function PlayLanguageInner() {
                 Play again
               </button>
               <Link
-                to="/leaderboard/$languageId"
-                params={{ languageId: lang.id }}
+                to="/leaderboard/$languageId/$deckId"
+                params={{ languageId, deckId }}
                 className="block w-full rounded-xl border border-border font-medium py-3.5 text-center"
               >
                 Leaderboard
               </Link>
               <Link
-                to="/"
+                to="/language/$languageId"
+                params={{ languageId }}
                 className="block w-full rounded-xl border border-border font-medium py-3.5 text-center"
               >
-                Home
+                Back to decks
               </Link>
             </div>
           </motion.div>
@@ -251,12 +258,13 @@ function PlayLanguageInner() {
       <div className="w-full max-w-[420px] px-5 pt-6 pb-8 flex flex-col min-h-dvh">
         <div className="flex items-center justify-between mb-2">
           <Link
-            to="/"
+            to="/language/$languageId"
+            params={{ languageId }}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <div className="text-sm font-medium">{lang.name}</div>
+          <div className="text-sm font-medium">{deck.name}</div>
           <div className="text-xs text-muted-foreground tabular-nums">
             {index + 1} / {total}
           </div>
@@ -267,8 +275,8 @@ function PlayLanguageInner() {
             Score: <span className="text-foreground font-medium tabular-nums">{score}</span>
           </span>
           <span className="inline-flex items-center gap-1">
-            <Trophy className="w-3 h-3" /> High:{" "}
-            <span className="text-foreground font-medium tabular-nums">{lang.highScore}</span>
+            <Trophy className="w-3 h-3" /> Best:{" "}
+            <span className="text-foreground font-medium tabular-nums">{prevHighScore.current}</span>
           </span>
         </div>
 

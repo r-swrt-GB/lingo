@@ -2,23 +2,34 @@ import { supabase } from "./supabase";
 
 export type Word = { id: string; target: string; english: string };
 export type Role = "owner" | "editor" | "viewer";
+
 export type Language = {
   id: string;
   name: string;
-  words: Word[];
-  highScore: number;
   isPublic: boolean;
   userId: string;
   createdBy: string;
   myRole: Role;
 };
 
+export type LanguageDetail = Language & { words: Word[] };
+
+export type Deck = {
+  id: string;
+  languageId: string;
+  name: string;
+  wordCount: number;
+  myHighScore: number;
+};
+
 type DbLanguage = {
   id: string;
   name: string;
-  high_score: number;
   is_public: boolean;
   user_id: string;
+};
+
+type DbLanguageDetail = DbLanguage & {
   words: { id: string; target: string; english: string }[];
 };
 
@@ -26,12 +37,10 @@ function mapLanguage(row: DbLanguage, createdBy: string, myRole: Role): Language
   return {
     id: row.id,
     name: row.name,
-    highScore: row.high_score,
     isPublic: row.is_public,
     userId: row.user_id,
     createdBy,
     myRole,
-    words: row.words ?? [],
   };
 }
 
@@ -49,7 +58,6 @@ async function profilesByUserId(userIds: string[]): Promise<Map<string, ProfileI
   );
 }
 
-// Roles I hold across all languages, keyed by language id (excludes ownership).
 async function myMemberRoles(userId: string): Promise<Map<string, Role>> {
   const { data } = await supabase
     .from("language_members")
@@ -76,7 +84,7 @@ export async function getLanguages(): Promise<Language[]> {
   const me = await getUserId();
   const { data, error } = await supabase
     .from("languages")
-    .select("id, name, high_score, is_public, user_id, words(id, target, english)")
+    .select("id, name, is_public, user_id")
     .order("created_at", { ascending: true });
   if (error) throw error;
   const rows = data as DbLanguage[];
@@ -89,20 +97,23 @@ export async function getLanguages(): Promise<Language[]> {
   );
 }
 
-export async function getLanguage(id: string): Promise<Language | undefined> {
+export async function getLanguage(id: string): Promise<LanguageDetail | undefined> {
   const me = await getUserId();
   const { data, error } = await supabase
     .from("languages")
-    .select("id, name, high_score, is_public, user_id, words(id, target, english)")
+    .select("id, name, is_public, user_id, words(id, target, english)")
     .eq("id", id)
     .single();
   if (error) {
     if (error.code === "PGRST116") return undefined;
     throw error;
   }
-  const row = data as DbLanguage;
+  const row = data as DbLanguageDetail;
   const [profiles, roles] = await Promise.all([profilesByUserId([row.user_id]), myMemberRoles(me)]);
-  return mapLanguage(row, profiles.get(row.user_id)?.username ?? "Unknown", resolveRole(row.user_id, row.id, me, roles));
+  return {
+    ...mapLanguage(row, profiles.get(row.user_id)?.username ?? "Unknown", resolveRole(row.user_id, row.id, me, roles)),
+    words: row.words ?? [],
+  };
 }
 
 export async function addLanguage(name: string, isPublic: boolean): Promise<Language> {
@@ -110,19 +121,17 @@ export async function addLanguage(name: string, isPublic: boolean): Promise<Lang
   const { data, error } = await supabase
     .from("languages")
     .insert({ name: name.trim(), user_id: userId, is_public: isPublic })
-    .select("id, name, high_score, is_public, user_id")
+    .select("id, name, is_public, user_id")
     .single();
   if (error) throw error;
   const profiles = await profilesByUserId([userId]);
   return {
     id: data.id,
     name: data.name,
-    highScore: data.high_score,
     isPublic: data.is_public,
     userId: data.user_id,
     createdBy: profiles.get(userId)?.username ?? "You",
     myRole: "owner",
-    words: [],
   };
 }
 
@@ -159,6 +168,129 @@ export async function deleteWord(wordId: string): Promise<void> {
   const { error } = await supabase.from("words").delete().eq("id", wordId);
   if (error) throw error;
 }
+
+// --- Decks ---
+
+export async function getDecks(languageId: string): Promise<Deck[]> {
+  const userId = await getUserId();
+  const { data: deckRows, error } = await supabase
+    .from("decks")
+    .select("id, language_id, name, deck_words(word_id)")
+    .eq("language_id", languageId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+
+  const deckIds = (deckRows ?? []).map((d) => d.id as string);
+  const scoreMap = new Map<string, number>();
+  if (deckIds.length > 0) {
+    const { data: scores } = await supabase
+      .from("scores")
+      .select("deck_id, score")
+      .in("deck_id", deckIds)
+      .eq("user_id", userId);
+    for (const s of scores ?? []) scoreMap.set(s.deck_id as string, s.score as number);
+  }
+
+  return (deckRows ?? []).map((d) => ({
+    id: d.id as string,
+    languageId: d.language_id as string,
+    name: d.name as string,
+    wordCount: Array.isArray(d.deck_words) ? (d.deck_words as unknown[]).length : 0,
+    myHighScore: scoreMap.get(d.id as string) ?? 0,
+  }));
+}
+
+export async function getDeck(deckId: string): Promise<{ id: string; languageId: string; name: string; myHighScore: number } | undefined> {
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from("decks")
+    .select("id, language_id, name")
+    .eq("id", deckId)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return undefined;
+    throw error;
+  }
+  const { data: scoreData } = await supabase
+    .from("scores")
+    .select("score")
+    .eq("deck_id", deckId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return {
+    id: data.id as string,
+    languageId: data.language_id as string,
+    name: data.name as string,
+    myHighScore: (scoreData?.score as number) ?? 0,
+  };
+}
+
+export async function addDeck(languageId: string, name: string): Promise<Deck> {
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from("decks")
+    .insert({ language_id: languageId, name: name.trim(), user_id: userId })
+    .select("id, language_id, name")
+    .single();
+  if (error) throw error;
+  return {
+    id: data.id as string,
+    languageId: data.language_id as string,
+    name: data.name as string,
+    wordCount: 0,
+    myHighScore: 0,
+  };
+}
+
+export async function deleteDeck(deckId: string): Promise<void> {
+  const { error } = await supabase.from("decks").delete().eq("id", deckId);
+  if (error) throw error;
+}
+
+export async function getDeckWords(deckId: string): Promise<Word[]> {
+  const { data: dwData, error: dwError } = await supabase
+    .from("deck_words")
+    .select("word_id")
+    .eq("deck_id", deckId);
+  if (dwError) throw dwError;
+  const wordIds = (dwData ?? []).map((r) => r.word_id as string);
+  if (wordIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("words")
+    .select("id, target, english")
+    .in("id", wordIds);
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    target: r.target as string,
+    english: r.english as string,
+  }));
+}
+
+export async function getDeckWordIds(deckId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("deck_words")
+    .select("word_id")
+    .eq("deck_id", deckId);
+  if (error) throw error;
+  return new Set((data ?? []).map((r) => r.word_id as string));
+}
+
+export async function addWordToDeck(deckId: string, wordId: string): Promise<void> {
+  const { error } = await supabase.from("deck_words").insert({ deck_id: deckId, word_id: wordId });
+  if (error) throw error;
+}
+
+export async function removeWordFromDeck(deckId: string, wordId: string): Promise<void> {
+  const { error } = await supabase
+    .from("deck_words")
+    .delete()
+    .eq("deck_id", deckId)
+    .eq("word_id", wordId);
+  if (error) throw error;
+}
+
+// --- Users / Members ---
 
 export type UserSearchResult = { id: string; email: string; username: string };
 
@@ -226,6 +358,8 @@ export async function removeMember(languageId: string, userId: string): Promise<
   if (error) throw error;
 }
 
+// --- Profile ---
+
 export type Profile = { email: string; username: string };
 
 export async function isUsernameTaken(username: string, excludeUserId?: string): Promise<boolean> {
@@ -260,14 +394,16 @@ export async function updateUsername(username: string): Promise<void> {
     .upsert({ id: userId, username: trimmed, updated_at: new Date().toISOString() });
   if (error) throw error;
 
-  // Keep the auth metadata and any existing leaderboard rows in sync with the new name.
   await supabase.auth.updateUser({ data: { username: trimmed } });
   await supabase.from("scores").update({ name: trimmed }).eq("user_id", userId);
 }
 
+// --- Scores / Leaderboard ---
+
 export type LeaderboardEntry = { userId: string; name: string; score: number };
 
-export async function submitScore(languageId: string, score: number): Promise<void> {
+// Returns true if the submitted score is a new personal best.
+export async function submitScore(deckId: string, score: number): Promise<boolean> {
   const {
     data: { user },
     error: userError,
@@ -276,41 +412,35 @@ export async function submitScore(languageId: string, score: number): Promise<vo
   const username = (user.user_metadata?.username as string | undefined)?.trim();
   const name = username || (user.email ?? "Anonymous").split("@")[0];
 
-  // Only keep each player's personal best for this language.
   const { data: existing } = await supabase
     .from("scores")
     .select("score")
-    .eq("language_id", languageId)
+    .eq("deck_id", deckId)
     .eq("user_id", user.id)
     .maybeSingle();
-  if (existing && existing.score >= score) return;
+  if (existing && existing.score >= score) return false;
 
   const { error } = await supabase
     .from("scores")
     .upsert(
-      { language_id: languageId, user_id: user.id, name, score, updated_at: new Date().toISOString() },
-      { onConflict: "language_id,user_id" },
+      { deck_id: deckId, user_id: user.id, name, score, updated_at: new Date().toISOString() },
+      { onConflict: "deck_id,user_id" },
     );
   if (error) throw error;
+  return true;
 }
 
-export async function getLeaderboard(languageId: string): Promise<LeaderboardEntry[]> {
+export async function getLeaderboard(deckId: string): Promise<LeaderboardEntry[]> {
   const { data, error } = await supabase
     .from("scores")
     .select("user_id, name, score")
-    .eq("language_id", languageId)
+    .eq("deck_id", deckId)
     .order("score", { ascending: false })
     .order("updated_at", { ascending: true });
   if (error) throw error;
-  return (data ?? []).map((r) => ({ userId: r.user_id as string, name: r.name as string, score: r.score as number }));
-}
-
-export async function updateHighScore(languageId: string, score: number, currentHigh: number): Promise<boolean> {
-  if (score <= currentHigh) return false;
-  const { error } = await supabase
-    .from("languages")
-    .update({ high_score: score })
-    .eq("id", languageId);
-  if (error) throw error;
-  return true;
+  return (data ?? []).map((r) => ({
+    userId: r.user_id as string,
+    name: r.name as string,
+    score: r.score as number,
+  }));
 }

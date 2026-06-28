@@ -37,12 +37,40 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
+const IMAGE_EXTENSIONS = /\.(?:png|jpe?g|gif|webp|avif|svg|ico)$/i;
+
+// Tell browsers to cache images on-device. The files in /public/images aren't
+// content-hashed, so we cache for a week and allow stale-while-revalidate rather
+// than marking them immutable — that keeps long-lived caching without pinning a
+// stale logo forever after it's replaced.
+function withImageCacheHeaders(request: Request, response: Response): Response {
+  if (!response.ok) return response;
+
+  const pathname = new URL(request.url).pathname;
+  const contentType = response.headers.get("content-type") ?? "";
+  const isImage = IMAGE_EXTENSIONS.test(pathname) || contentType.startsWith("image/");
+  if (!isImage) return response;
+
+  // Respect a Cache-Control the upstream handler already set deliberately.
+  if (response.headers.has("cache-control")) return response;
+
+  const headers = new Headers(response.headers);
+  headers.set("cache-control", "public, max-age=604800, stale-while-revalidate=86400");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      return withImageCacheHeaders(request, normalized);
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

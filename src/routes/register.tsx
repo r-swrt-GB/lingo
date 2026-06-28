@@ -2,6 +2,7 @@ import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-ro
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { isUsernameTaken } from "@/lib/storage";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/register")({
   beforeLoad: async () => {
@@ -21,7 +22,6 @@ function Register() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [verifyPending, setVerifyPending] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,33 +46,11 @@ function Register() {
     setLoading(false);
     if (error) {
       setError(error.message);
-    } else if (data.session) {
-      navigate({ to: "/" });
     } else {
-      setVerifyPending(true);
+      toast.success("You're registered! You can now log in.");
+      navigate({ to: "/login" });
     }
   };
-
-  if (verifyPending) {
-    return (
-      <div className="min-h-dvh flex items-center justify-center px-5">
-        <div className="w-full max-w-[360px] text-center">
-          <img src="/images/logo_with_mascot.png" alt="Lingo" className="h-28 mx-auto mb-14" />
-          <h1 className="text-2xl font-bold tracking-tight mb-2">Check your email</h1>
-          <p className="text-sm text-muted-foreground mb-6">
-            We sent a confirmation link to <span className="text-foreground font-medium">{email}</span>. Open it to
-            activate your account.
-          </p>
-          <Link
-            to="/login"
-            className="inline-flex items-center justify-center rounded-xl border border-border px-5 py-2.5 text-sm font-medium"
-          >
-            Back to sign in
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-dvh flex items-center justify-center px-5">

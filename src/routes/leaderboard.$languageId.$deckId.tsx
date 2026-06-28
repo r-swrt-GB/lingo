@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Trophy, Medal } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { getLanguage, getLeaderboard } from "@/lib/storage";
+import { getDeck, getLeaderboard } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
 import { RequireAuth } from "@/components/require-auth";
 
-export const Route = createFileRoute("/leaderboard/$languageId")({
+export const Route = createFileRoute("/leaderboard/$languageId/$deckId")({
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
     const {
@@ -29,7 +29,7 @@ function LeaderboardPage() {
 const medalColor = ["text-[#f5c518]", "text-[#b8b8b8]", "text-[#cd7f32]"];
 
 function LeaderboardInner() {
-  const { languageId } = Route.useParams();
+  const { languageId, deckId } = Route.useParams();
   const navigate = useNavigate();
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -37,24 +37,24 @@ function LeaderboardInner() {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
   }, []);
 
-  const { data: lang } = useQuery({
-    queryKey: ["language", languageId],
-    queryFn: () => getLanguage(languageId),
+  const { data: deck } = useQuery({
+    queryKey: ["deck", deckId],
+    queryFn: () => getDeck(deckId),
   });
 
   const { data: entries = [], isLoading } = useQuery({
-    queryKey: ["leaderboard", languageId],
-    queryFn: () => getLeaderboard(languageId),
+    queryKey: ["leaderboard", deckId],
+    queryFn: () => getLeaderboard(deckId),
   });
 
-  if (!lang && !isLoading) {
+  if (!deck && !isLoading) {
     return (
       <div className="min-h-dvh flex items-center justify-center px-5">
         <button
-          onClick={() => navigate({ to: "/" })}
+          onClick={() => navigate({ to: "/language/$languageId", params: { languageId } })}
           className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm"
         >
-          Go home
+          Go back
         </button>
       </div>
     );
@@ -64,7 +64,8 @@ function LeaderboardInner() {
     <div className="min-h-dvh flex justify-center">
       <div className="w-full max-w-[420px] px-5 pt-8 pb-16">
         <Link
-          to="/"
+          to="/language/$languageId"
+          params={{ languageId }}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground mb-6 hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4" /> Back
@@ -72,7 +73,7 @@ function LeaderboardInner() {
 
         <header className="mb-8">
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-1">Leaderboard</div>
-          <h1 className="text-3xl font-bold tracking-tight">{lang?.name ?? "…"}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{deck?.name ?? "…"}</h1>
         </header>
 
         {isLoading ? (
@@ -86,8 +87,8 @@ function LeaderboardInner() {
             <Trophy className="w-6 h-6 mx-auto text-muted-foreground mb-3" />
             <p className="text-sm text-muted-foreground">No scores yet. Be the first to play!</p>
             <Link
-              to="/play/$languageId"
-              params={{ languageId }}
+              to="/play/$languageId/$deckId"
+              params={{ languageId, deckId }}
               className="inline-block mt-4 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium"
             >
               Play now

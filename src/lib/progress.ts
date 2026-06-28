@@ -8,19 +8,19 @@ export type SavedProgress = {
   score: number;
 };
 
-const key = (languageId: string) => `wordy:progress:${languageId}`;
+const key = (deckId: string) => `wordy:progress:${deckId}`;
 
-export function saveProgress(languageId: string, data: SavedProgress): void {
+export function saveProgress(deckId: string, data: SavedProgress): void {
   try {
-    localStorage.setItem(key(languageId), JSON.stringify(data));
+    localStorage.setItem(key(deckId), JSON.stringify(data));
   } catch {
     // storage may be unavailable (private mode, quota) — fail silently
   }
 }
 
-export function clearProgress(languageId: string): void {
+export function clearProgress(deckId: string): void {
   try {
-    localStorage.removeItem(key(languageId));
+    localStorage.removeItem(key(deckId));
   } catch {
     // ignore
   }
@@ -29,9 +29,9 @@ export function clearProgress(languageId: string): void {
 // Returns saved progress only if it's still a coherent, in-progress session
 // for the current set of words. Any mismatch (words added/removed, finished,
 // not started) is treated as no progress.
-export function loadProgress(languageId: string, words: Word[]): SavedProgress | null {
+export function loadProgress(deckId: string, words: Word[]): SavedProgress | null {
   try {
-    const raw = localStorage.getItem(key(languageId));
+    const raw = localStorage.getItem(key(deckId));
     if (!raw) return null;
     const data = JSON.parse(raw) as SavedProgress;
     if (
@@ -53,6 +53,6 @@ export function loadProgress(languageId: string, words: Word[]): SavedProgress |
   }
 }
 
-export function hasProgress(languageId: string, words: Word[]): boolean {
-  return loadProgress(languageId, words) !== null;
+export function hasProgress(deckId: string, words: Word[]): boolean {
+  return loadProgress(deckId, words) !== null;
 }
