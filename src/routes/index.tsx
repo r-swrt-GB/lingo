@@ -1,6 +1,6 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Layers, Pencil, Trash2, LogOut, User } from "lucide-react";
+import { Plus, Layers, Trash2, LogOut, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { addLanguage, deleteLanguage, getLanguages } from "@/lib/storage";
@@ -121,16 +121,6 @@ function Home() {
                         </p>
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
-                        {lang.myRole === "owner" && (
-                          <Link
-                            to="/edit/$languageId"
-                            params={{ languageId: lang.id }}
-                            className="text-muted-foreground hover:text-foreground p-1"
-                            aria-label="Manage members"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Link>
-                        )}
                         {lang.myRole === "owner" && (
                           <button
                             onClick={() => {

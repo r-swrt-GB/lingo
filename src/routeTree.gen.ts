@@ -17,7 +17,7 @@ import { Route as LanguageLanguageIdRouteImport } from './routes/language.$langu
 import { Route as EditLanguageIdRouteImport } from './routes/edit.$languageId'
 import { Route as PlayLanguageIdDeckIdRouteImport } from './routes/play.$languageId.$deckId'
 import { Route as LeaderboardLanguageIdDeckIdRouteImport } from './routes/leaderboard.$languageId.$deckId'
-import { Route as EditLanguageIdDeckIdRouteImport } from './routes/edit.$languageId.$deckId'
+import { Route as DeckLanguageIdDeckIdRouteImport } from './routes/deck.$languageId.$deckId'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -60,10 +60,10 @@ const LeaderboardLanguageIdDeckIdRoute =
     path: '/leaderboard/$languageId/$deckId',
     getParentRoute: () => rootRouteImport,
   } as any)
-const EditLanguageIdDeckIdRoute = EditLanguageIdDeckIdRouteImport.update({
-  id: '/$deckId',
-  path: '/$deckId',
-  getParentRoute: () => EditLanguageIdRoute,
+const DeckLanguageIdDeckIdRoute = DeckLanguageIdDeckIdRouteImport.update({
+  id: '/deck/$languageId/$deckId',
+  path: '/deck/$languageId/$deckId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -71,9 +71,9 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
-  '/edit/$languageId': typeof EditLanguageIdRouteWithChildren
+  '/edit/$languageId': typeof EditLanguageIdRoute
   '/language/$languageId': typeof LanguageLanguageIdRoute
-  '/edit/$languageId/$deckId': typeof EditLanguageIdDeckIdRoute
+  '/deck/$languageId/$deckId': typeof DeckLanguageIdDeckIdRoute
   '/leaderboard/$languageId/$deckId': typeof LeaderboardLanguageIdDeckIdRoute
   '/play/$languageId/$deckId': typeof PlayLanguageIdDeckIdRoute
 }
@@ -82,9 +82,9 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
-  '/edit/$languageId': typeof EditLanguageIdRouteWithChildren
+  '/edit/$languageId': typeof EditLanguageIdRoute
   '/language/$languageId': typeof LanguageLanguageIdRoute
-  '/edit/$languageId/$deckId': typeof EditLanguageIdDeckIdRoute
+  '/deck/$languageId/$deckId': typeof DeckLanguageIdDeckIdRoute
   '/leaderboard/$languageId/$deckId': typeof LeaderboardLanguageIdDeckIdRoute
   '/play/$languageId/$deckId': typeof PlayLanguageIdDeckIdRoute
 }
@@ -94,9 +94,9 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
-  '/edit/$languageId': typeof EditLanguageIdRouteWithChildren
+  '/edit/$languageId': typeof EditLanguageIdRoute
   '/language/$languageId': typeof LanguageLanguageIdRoute
-  '/edit/$languageId/$deckId': typeof EditLanguageIdDeckIdRoute
+  '/deck/$languageId/$deckId': typeof DeckLanguageIdDeckIdRoute
   '/leaderboard/$languageId/$deckId': typeof LeaderboardLanguageIdDeckIdRoute
   '/play/$languageId/$deckId': typeof PlayLanguageIdDeckIdRoute
 }
@@ -109,7 +109,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/edit/$languageId'
     | '/language/$languageId'
-    | '/edit/$languageId/$deckId'
+    | '/deck/$languageId/$deckId'
     | '/leaderboard/$languageId/$deckId'
     | '/play/$languageId/$deckId'
   fileRoutesByTo: FileRoutesByTo
@@ -120,7 +120,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/edit/$languageId'
     | '/language/$languageId'
-    | '/edit/$languageId/$deckId'
+    | '/deck/$languageId/$deckId'
     | '/leaderboard/$languageId/$deckId'
     | '/play/$languageId/$deckId'
   id:
@@ -131,7 +131,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/edit/$languageId'
     | '/language/$languageId'
-    | '/edit/$languageId/$deckId'
+    | '/deck/$languageId/$deckId'
     | '/leaderboard/$languageId/$deckId'
     | '/play/$languageId/$deckId'
   fileRoutesById: FileRoutesById
@@ -141,8 +141,9 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
-  EditLanguageIdRoute: typeof EditLanguageIdRouteWithChildren
+  EditLanguageIdRoute: typeof EditLanguageIdRoute
   LanguageLanguageIdRoute: typeof LanguageLanguageIdRoute
+  DeckLanguageIdDeckIdRoute: typeof DeckLanguageIdDeckIdRoute
   LeaderboardLanguageIdDeckIdRoute: typeof LeaderboardLanguageIdDeckIdRoute
   PlayLanguageIdDeckIdRoute: typeof PlayLanguageIdDeckIdRoute
 }
@@ -205,35 +206,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeaderboardLanguageIdDeckIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/edit/$languageId/$deckId': {
-      id: '/edit/$languageId/$deckId'
-      path: '/$deckId'
-      fullPath: '/edit/$languageId/$deckId'
-      preLoaderRoute: typeof EditLanguageIdDeckIdRouteImport
-      parentRoute: typeof EditLanguageIdRoute
+    '/deck/$languageId/$deckId': {
+      id: '/deck/$languageId/$deckId'
+      path: '/deck/$languageId/$deckId'
+      fullPath: '/deck/$languageId/$deckId'
+      preLoaderRoute: typeof DeckLanguageIdDeckIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
-
-interface EditLanguageIdRouteChildren {
-  EditLanguageIdDeckIdRoute: typeof EditLanguageIdDeckIdRoute
-}
-
-const EditLanguageIdRouteChildren: EditLanguageIdRouteChildren = {
-  EditLanguageIdDeckIdRoute: EditLanguageIdDeckIdRoute,
-}
-
-const EditLanguageIdRouteWithChildren = EditLanguageIdRoute._addFileChildren(
-  EditLanguageIdRouteChildren,
-)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
-  EditLanguageIdRoute: EditLanguageIdRouteWithChildren,
+  EditLanguageIdRoute: EditLanguageIdRoute,
   LanguageLanguageIdRoute: LanguageLanguageIdRoute,
+  DeckLanguageIdDeckIdRoute: DeckLanguageIdDeckIdRoute,
   LeaderboardLanguageIdDeckIdRoute: LeaderboardLanguageIdDeckIdRoute,
   PlayLanguageIdDeckIdRoute: PlayLanguageIdDeckIdRoute,
 }

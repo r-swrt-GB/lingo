@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { RequireAuth } from "@/components/require-auth";
 import { ImportWordsDialog } from "@/components/import-words-dialog";
 
-export const Route = createFileRoute("/edit/$languageId/$deckId")({
+export const Route = createFileRoute("/deck/$languageId/$deckId")({
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
     const {

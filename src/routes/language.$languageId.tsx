@@ -162,7 +162,7 @@ function LanguagePageInner() {
                       </Link>
                       {canEdit && (
                         <Link
-                          to="/edit/$languageId/$deckId"
+                          to="/deck/$languageId/$deckId"
                           params={{ languageId, deckId: deck.id }}
                           className="text-muted-foreground hover:text-foreground p-1"
                           aria-label="Edit deck"
