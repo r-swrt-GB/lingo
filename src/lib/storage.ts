@@ -24,23 +24,19 @@ async function getUserId(): Promise<string> {
 }
 
 export async function getLanguages(): Promise<Language[]> {
-  const userId = await getUserId();
   const { data, error } = await supabase
     .from("languages")
     .select("id, name, high_score, words(id, target, english)")
-    .eq("user_id", userId)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data as DbLanguage[]).map(mapLanguage);
 }
 
 export async function getLanguage(id: string): Promise<Language | undefined> {
-  const userId = await getUserId();
   const { data, error } = await supabase
     .from("languages")
     .select("id, name, high_score, words(id, target, english)")
     .eq("id", id)
-    .eq("user_id", userId)
     .single();
   if (error) {
     if (error.code === "PGRST116") return undefined;
@@ -61,8 +57,7 @@ export async function addLanguage(name: string): Promise<Language> {
 }
 
 export async function deleteLanguage(id: string): Promise<void> {
-  const userId = await getUserId();
-  const { error } = await supabase.from("languages").delete().eq("id", id).eq("user_id", userId);
+  const { error } = await supabase.from("languages").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -75,19 +70,16 @@ export async function addWord(languageId: string, target: string, english: strin
 }
 
 export async function deleteWord(wordId: string): Promise<void> {
-  const userId = await getUserId();
-  const { error } = await supabase.from("words").delete().eq("id", wordId).eq("user_id", userId);
+  const { error } = await supabase.from("words").delete().eq("id", wordId);
   if (error) throw error;
 }
 
 export async function updateHighScore(languageId: string, score: number, currentHigh: number): Promise<boolean> {
   if (score <= currentHigh) return false;
-  const userId = await getUserId();
   const { error } = await supabase
     .from("languages")
     .update({ high_score: score })
-    .eq("id", languageId)
-    .eq("user_id", userId);
+    .eq("id", languageId);
   if (error) throw error;
   return true;
 }
