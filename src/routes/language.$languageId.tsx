@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { addDeck, deleteDeck, getDecks, getLanguage } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
 import { RequireAuth } from "@/components/require-auth";
+import { GameModeDialog } from "@/components/game-mode-dialog";
 
 export const Route = createFileRoute("/language/$languageId")({
   beforeLoad: async () => {
@@ -185,13 +186,11 @@ function LanguagePageInner() {
                   </div>
                   <div className="mt-3">
                     {canPlay ? (
-                      <Link
-                        to="/play/$languageId/$deckId"
-                        params={{ languageId, deckId: deck.id }}
-                        className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium py-2.5 active:scale-[0.98] transition-transform"
-                      >
-                        <Play className="w-4 h-4" /> Play
-                      </Link>
+                      <GameModeDialog
+                        languageId={languageId}
+                        deckId={deck.id}
+                        wordCount={deck.wordCount}
+                      />
                     ) : (
                       <button
                         disabled

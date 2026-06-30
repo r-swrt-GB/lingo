@@ -89,6 +89,7 @@ function LeaderboardInner() {
             <Link
               to="/play/$languageId/$deckId"
               params={{ languageId, deckId }}
+              search={{ mode: "full" }}
               className="inline-block mt-4 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium"
             >
               Play now

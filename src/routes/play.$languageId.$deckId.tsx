@@ -9,7 +9,21 @@ import { supabase } from "@/lib/supabase";
 import { RequireAuth } from "@/components/require-auth";
 import { speechSupported, useSpeak } from "@/lib/speech";
 
+export type GameMode = "blitz" | "full" | "custom";
+
+const BLITZ_COUNT = 10;
+
+type PlaySearch = { mode: GameMode; count?: number };
+
 export const Route = createFileRoute("/play/$languageId/$deckId")({
+  validateSearch: (search: Record<string, unknown>): PlaySearch => {
+    const mode: GameMode =
+      search.mode === "blitz" || search.mode === "custom" ? search.mode : "full";
+    const rawCount = Number(search.count);
+    const count =
+      Number.isFinite(rawCount) && rawCount > 0 ? Math.floor(rawCount) : undefined;
+    return { mode, count };
+  },
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
     const {
@@ -29,8 +43,8 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function buildSession(words: Word[]): Question[] {
-  const order = shuffle(words);
+function buildSession(words: Word[], limit: number): Question[] {
+  const order = shuffle(words).slice(0, Math.max(1, Math.min(limit, words.length)));
   return order.map((w) => {
     const distractors = shuffle(words.filter((x) => x.id !== w.id))
       .slice(0, 3)
@@ -50,6 +64,7 @@ function PlayDeck() {
 
 function PlayDeckInner() {
   const { languageId, deckId } = Route.useParams();
+  const { mode, count } = Route.useSearch();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const prevHighScore = useRef(0);
@@ -79,6 +94,9 @@ function PlayDeckInner() {
       queryClient.invalidateQueries({ queryKey: ["leaderboard", deckId] });
       if (isNewBest) setNewHigh(true);
     },
+    onError: (err) => {
+      console.error("Failed to save score:", err);
+    },
   });
 
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -97,18 +115,24 @@ function PlayDeckInner() {
     }
   }, [deck, ready]);
 
+  const contributesToLeaderboard = mode === "full";
+  const sessionLimit =
+    mode === "blitz" ? BLITZ_COUNT : mode === "custom" ? (count ?? words.length) : words.length;
+
   useEffect(() => {
     if (words.length === 0 || ready) return;
-    const saved = loadProgress(deckId, words);
+    // Resume is only meaningful for the full ranked run; Blitz/Custom are
+    // ephemeral, randomised sessions so they always start fresh.
+    const saved = contributesToLeaderboard ? loadProgress(deckId, words) : null;
     if (saved) {
       setQuestions(saved.questions);
       setIndex(saved.index);
       setScore(saved.score);
     } else {
-      setQuestions(buildSession(words));
+      setQuestions(buildSession(words, sessionLimit));
     }
     setReady(true);
-  }, [words, deckId, ready]);
+  }, [words, deckId, ready, contributesToLeaderboard, sessionLimit]);
 
   if (deckLoading || wordsLoading) {
     return (
@@ -172,7 +196,7 @@ function PlayDeckInner() {
 
   const next = () => {
     if (index + 1 >= total) {
-      scoreMutation.mutate(score);
+      if (contributesToLeaderboard) scoreMutation.mutate(score);
       clearProgress(deckId);
       setFinished(true);
     } else {
@@ -180,14 +204,14 @@ function PlayDeckInner() {
       setIndex(nextIndex);
       setSelected(null);
       setSubmitted(false);
-      saveProgress(deckId, { questions, index: nextIndex, score });
+      if (contributesToLeaderboard) saveProgress(deckId, { questions, index: nextIndex, score });
     }
   };
 
   const playAgain = () => {
     clearProgress(deckId);
     prevHighScore.current = Math.max(prevHighScore.current, score);
-    setQuestions(buildSession(words));
+    setQuestions(buildSession(words, sessionLimit));
     setIndex(0);
     setSelected(null);
     setSubmitted(false);
@@ -219,11 +243,17 @@ function PlayDeckInner() {
               {finalScore}
               <span className="text-muted-foreground">/{total}</span>
             </div>
-            <div className="mt-6 flex items-center gap-2 text-sm">
-              <Trophy className="w-4 h-4" />
-              <span>High score: {bestScore}</span>
-            </div>
-            {newHigh && (
+            {contributesToLeaderboard ? (
+              <div className="mt-6 flex items-center gap-2 text-sm">
+                <Trophy className="w-4 h-4" />
+                <span>High score: {bestScore}</span>
+              </div>
+            ) : (
+              <div className="mt-6 text-sm text-muted-foreground">
+                {mode === "blitz" ? "Blitz" : "Custom"} practice · not added to the leaderboard
+              </div>
+            )}
+            {contributesToLeaderboard && newHigh && (
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -231,6 +261,18 @@ function PlayDeckInner() {
               >
                 New high score
               </motion.div>
+            )}
+            {scoreMutation.isError && (
+              <div className="mt-3 flex flex-col items-center gap-2">
+                <span className="text-xs text-[color:var(--color-error)]">Couldn't save your score.</span>
+                <button
+                  onClick={() => scoreMutation.mutate(finalScore)}
+                  disabled={scoreMutation.isPending}
+                  className="rounded-full border border-border px-3 py-1 text-xs font-medium disabled:opacity-50"
+                >
+                  {scoreMutation.isPending ? "Saving…" : "Retry"}
+                </button>
+              </div>
             )}
             <div className="mt-12 w-full space-y-2">
               <button
@@ -271,7 +313,12 @@ function PlayDeckInner() {
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <div className="text-sm font-medium">{deck.name}</div>
+          <div className="flex flex-col items-center">
+            <div className="text-sm font-medium">{deck.name}</div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              {mode === "full" ? "Full" : mode === "blitz" ? "Blitz" : "Custom"}
+            </div>
+          </div>
           <div className="text-xs text-muted-foreground tabular-nums">
             {index + 1} / {total}
           </div>
@@ -281,10 +328,14 @@ function PlayDeckInner() {
           <span>
             Score: <span className="text-foreground font-medium tabular-nums">{score}</span>
           </span>
-          <span className="inline-flex items-center gap-1">
-            <Trophy className="w-3 h-3" /> Best:{" "}
-            <span className="text-foreground font-medium tabular-nums">{prevHighScore.current}</span>
-          </span>
+          {contributesToLeaderboard ? (
+            <span className="inline-flex items-center gap-1">
+              <Trophy className="w-3 h-3" /> Best:{" "}
+              <span className="text-foreground font-medium tabular-nums">{prevHighScore.current}</span>
+            </span>
+          ) : (
+            <span>Practice · not ranked</span>
+          )}
         </div>
 
         <div className="h-0.5 bg-muted rounded-full overflow-hidden mb-10">

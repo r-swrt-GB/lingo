@@ -452,21 +452,30 @@ export async function submitScore(deckId: string, score: number): Promise<boolea
   const username = (user.user_metadata?.username as string | undefined)?.trim();
   const name = username || (user.email ?? "Anonymous").split("@")[0];
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from("scores")
     .select("score")
     .eq("deck_id", deckId)
     .eq("user_id", user.id)
     .maybeSingle();
+  if (existingError) throw existingError;
   if (existing && existing.score >= score) return false;
 
-  const { error } = await supabase
-    .from("scores")
-    .upsert(
-      { deck_id: deckId, user_id: user.id, name, score, updated_at: new Date().toISOString() },
-      { onConflict: "deck_id,user_id" },
-    );
-  if (error) throw error;
+  // Explicit update-or-insert rather than an upsert, so saving does not
+  // depend on a (deck_id, user_id) unique constraint existing on the table.
+  if (existing) {
+    const { error } = await supabase
+      .from("scores")
+      .update({ name, score, updated_at: new Date().toISOString() })
+      .eq("deck_id", deckId)
+      .eq("user_id", user.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("scores")
+      .insert({ deck_id: deckId, user_id: user.id, name, score, updated_at: new Date().toISOString() });
+    if (error) throw error;
+  }
   return true;
 }
 
