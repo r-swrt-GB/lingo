@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { synthesizeSpeech } from "./tts";
 
 // Single source of truth for selectable languages. The same catalog powers the
 // language picker when creating a language AND the voice lookup here, so a
@@ -69,28 +70,72 @@ function pickVoice(voices: SpeechSynthesisVoice[], locale: string | undefined) {
   );
 }
 
+// Cache synthesized audio per session (words repeat constantly), and remember
+// locales Google can't handle so we skip straight to the browser voice for them.
+const audioCache = new Map<string, string>();
+const googleUnsupported = new Set<string>();
+let currentAudio: HTMLAudioElement | null = null;
+
+function speakWithWebSpeech(text: string, locale: string | undefined, voices: SpeechSynthesisVoice[]) {
+  if (!speechSupported) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  const voice = pickVoice(voices, locale);
+  if (voice) {
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+  } else if (locale) {
+    utterance.lang = locale;
+  }
+  utterance.rate = 0.9;
+  window.speechSynthesis.speak(utterance);
+}
+
+function stopPlayback() {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  if (speechSupported) window.speechSynthesis.cancel();
+}
+
 /**
- * Returns a `speak(text)` function that pronounces text using the Web Speech
- * API, picking the best available voice for the given BCP-47 locale. Falls back
- * to the browser default when no matching voice exists.
+ * Returns a `speak(text)` function that pronounces text with Google Cloud TTS
+ * (via the server proxy), falling back to the browser's Web Speech voice when
+ * Google is unavailable or doesn't support the locale.
  */
 export function useSpeak(locale: string | undefined) {
   const voices = useVoices();
 
   return useCallback(
-    (text: string) => {
-      if (!speechSupported || !text.trim()) return;
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      const voice = pickVoice(voices, locale);
-      if (voice) {
-        utterance.voice = voice;
-        utterance.lang = voice.lang;
-      } else if (locale) {
-        utterance.lang = locale;
+    async (text: string) => {
+      const value = text.trim();
+      if (!value) return;
+      const lang = locale ?? "en-US";
+      stopPlayback();
+
+      // Locales Google has already rejected go straight to the browser voice.
+      if (!googleUnsupported.has(lang)) {
+        const key = `${lang}|${value}`;
+        try {
+          let audioContent = audioCache.get(key);
+          if (!audioContent) {
+            const result = await synthesizeSpeech({ data: { text: value, locale: lang } });
+            audioContent = result.audioContent;
+            audioCache.set(key, audioContent);
+          }
+          const audio = new Audio(`data:audio/mp3;base64,${audioContent}`);
+          currentAudio = audio;
+          await audio.play();
+          return;
+        } catch {
+          // Treat any failure (unsupported locale, missing key, network) as a
+          // signal to use the browser voice instead.
+          googleUnsupported.add(lang);
+        }
       }
-      utterance.rate = 0.9;
-      window.speechSynthesis.speak(utterance);
+
+      speakWithWebSpeech(value, locale, voices);
     },
     [voices, locale],
   );
