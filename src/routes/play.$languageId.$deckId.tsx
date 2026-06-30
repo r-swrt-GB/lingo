@@ -87,7 +87,7 @@ function PlayDeckInner() {
   const speak = useSpeak(languageLocale);
 
   const scoreMutation = useMutation({
-    mutationFn: (score: number) => submitScore(deckId, score),
+    mutationFn: (score: number) => submitScore(deckId, languageId, score),
     onSuccess: (isNewBest) => {
       queryClient.invalidateQueries({ queryKey: ["deck", deckId] });
       queryClient.invalidateQueries({ queryKey: ["decks", languageId] });

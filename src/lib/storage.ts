@@ -443,7 +443,7 @@ export async function updateUsername(username: string): Promise<void> {
 export type LeaderboardEntry = { userId: string; name: string; score: number };
 
 // Returns true if the submitted score is a new personal best.
-export async function submitScore(deckId: string, score: number): Promise<boolean> {
+export async function submitScore(deckId: string, languageId: string, score: number): Promise<boolean> {
   const {
     data: { user },
     error: userError,
@@ -473,7 +473,7 @@ export async function submitScore(deckId: string, score: number): Promise<boolea
   } else {
     const { error } = await supabase
       .from("scores")
-      .insert({ deck_id: deckId, user_id: user.id, name, score, updated_at: new Date().toISOString() });
+      .insert({ deck_id: deckId, language_id: languageId, user_id: user.id, name, score, updated_at: new Date().toISOString() });
     if (error) throw error;
   }
   return true;
