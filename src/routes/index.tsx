@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Plus, Layers, Trash2, LogOut, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,6 +7,14 @@ import { addLanguage, deleteLanguage, getLanguages } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
 import { RequireAuth } from "@/components/require-auth";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { LANGUAGES } from "@/lib/speech";
 
 export const Route = createFileRoute("/")({
   beforeLoad: async () => {
@@ -27,6 +35,7 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { data: languages = [], isLoading } = useQuery({ queryKey: ["languages"], queryFn: getLanguages });
 
   const signOut = async () => {
@@ -35,7 +44,8 @@ function Home() {
   };
 
   const addMutation = useMutation({
-    mutationFn: ({ name, isPublic }: { name: string; isPublic: boolean }) => addLanguage(name, isPublic),
+    mutationFn: ({ name, locale, isPublic }: { name: string; locale: string; isPublic: boolean }) =>
+      addLanguage(name, locale, isPublic),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["languages"] }),
   });
 
@@ -50,9 +60,10 @@ function Home() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    const selected = LANGUAGES.find((l) => l.name === name);
+    if (!selected) return;
     addMutation.mutate(
-      { name, isPublic },
+      { name: selected.name, locale: selected.locale, isPublic },
       {
         onSuccess: () => {
           setName("");
@@ -167,13 +178,18 @@ function Home() {
                 onSubmit={submit}
                 className="rounded-xl border border-border bg-card p-3 space-y-2"
               >
-                <input
-                  autoFocus
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. French, Zulu, Japanese"
-                  className="w-full bg-transparent text-base outline-none px-2 py-2 placeholder:text-muted-foreground"
-                />
+                <Select value={name} onValueChange={setName}>
+                  <SelectTrigger className="w-full border-0 shadow-none text-base px-2 py-2 h-auto focus:ring-0">
+                    <SelectValue placeholder="Select a language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LANGUAGES.map((l) => (
+                      <SelectItem key={l.name} value={l.name}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <div className="flex items-center justify-between px-2 py-2 border-t border-border">
                   <div>
                     <p className="text-sm font-medium">{isPublic ? "Public" : "Private"}</p>

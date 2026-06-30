@@ -6,6 +6,7 @@ export type Role = "owner" | "editor" | "viewer";
 export type Language = {
   id: string;
   name: string;
+  locale: string;
   isPublic: boolean;
   userId: string;
   createdBy: string;
@@ -25,6 +26,7 @@ export type Deck = {
 type DbLanguage = {
   id: string;
   name: string;
+  locale: string;
   is_public: boolean;
   user_id: string;
 };
@@ -37,6 +39,7 @@ function mapLanguage(row: DbLanguage, createdBy: string, myRole: Role): Language
   return {
     id: row.id,
     name: row.name,
+    locale: row.locale,
     isPublic: row.is_public,
     userId: row.user_id,
     createdBy,
@@ -84,7 +87,7 @@ export async function getLanguages(): Promise<Language[]> {
   const me = await getUserId();
   const { data, error } = await supabase
     .from("languages")
-    .select("id, name, is_public, user_id")
+    .select("id, name, locale, is_public, user_id")
     .order("created_at", { ascending: true });
   if (error) throw error;
   const rows = data as DbLanguage[];
@@ -101,7 +104,7 @@ export async function getLanguage(id: string): Promise<LanguageDetail | undefine
   const me = await getUserId();
   const { data, error } = await supabase
     .from("languages")
-    .select("id, name, is_public, user_id, words(id, target, english)")
+    .select("id, name, locale, is_public, user_id, words(id, target, english)")
     .eq("id", id)
     .single();
   if (error) {
@@ -116,18 +119,19 @@ export async function getLanguage(id: string): Promise<LanguageDetail | undefine
   };
 }
 
-export async function addLanguage(name: string, isPublic: boolean): Promise<Language> {
+export async function addLanguage(name: string, locale: string, isPublic: boolean): Promise<Language> {
   const userId = await getUserId();
   const { data, error } = await supabase
     .from("languages")
-    .insert({ name: name.trim(), user_id: userId, is_public: isPublic })
-    .select("id, name, is_public, user_id")
+    .insert({ name: name.trim(), locale, user_id: userId, is_public: isPublic })
+    .select("id, name, locale, is_public, user_id")
     .single();
   if (error) throw error;
   const profiles = await profilesByUserId([userId]);
   return {
     id: data.id,
     name: data.name,
+    locale: data.locale,
     isPublic: data.is_public,
     userId: data.user_id,
     createdBy: profiles.get(userId)?.username ?? "You",

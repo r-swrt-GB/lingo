@@ -1,12 +1,13 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, X, Trophy } from "lucide-react";
+import { ArrowLeft, Check, X, Trophy, Volume2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getDeck, getDeckWords, submitScore, type Word } from "@/lib/storage";
+import { getDeck, getDeckWords, getLanguages, submitScore, type Word } from "@/lib/storage";
 import { clearProgress, loadProgress, saveProgress, type Question } from "@/lib/progress";
 import { supabase } from "@/lib/supabase";
 import { RequireAuth } from "@/components/require-auth";
+import { speechSupported, useSpeak } from "@/lib/speech";
 
 export const Route = createFileRoute("/play/$languageId/$deckId")({
   beforeLoad: async () => {
@@ -62,6 +63,13 @@ function PlayDeckInner() {
     queryKey: ["deck-words", deckId],
     queryFn: () => getDeckWords(deckId),
   });
+
+  const { data: languages = [] } = useQuery({
+    queryKey: ["languages"],
+    queryFn: getLanguages,
+  });
+  const languageLocale = languages.find((l) => l.id === languageId)?.locale;
+  const speak = useSpeak(languageLocale);
 
   const scoreMutation = useMutation({
     mutationFn: (score: number) => submitScore(deckId, score),
@@ -164,8 +172,7 @@ function PlayDeckInner() {
 
   const next = () => {
     if (index + 1 >= total) {
-      const finalScore = submitted && selected === current.word.english ? score + 1 : score;
-      scoreMutation.mutate(finalScore);
+      scoreMutation.mutate(score);
       clearProgress(deckId);
       setFinished(true);
     } else {
@@ -305,7 +312,19 @@ function PlayDeckInner() {
             className="text-center py-8 mb-6"
           >
             <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground mb-3">Translate</div>
-            <div className="text-5xl font-bold tracking-tight break-words">{current.word.target}</div>
+            <div className="flex items-center justify-center gap-3 break-words">
+              <span className="text-5xl font-bold tracking-tight">{current.word.target}</span>
+              {speechSupported && (
+                <button
+                  type="button"
+                  onClick={() => speak(current.word.target)}
+                  aria-label={`Pronounce ${current.word.target}`}
+                  className="shrink-0 rounded-full p-2 text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition"
+                >
+                  <Volume2 className="w-6 h-6" />
+                </button>
+              )}
+            </div>
           </motion.div>
         </AnimatePresence>
 
